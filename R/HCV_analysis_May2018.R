@@ -4,6 +4,8 @@ May2018_v210224 <- function()
 	dir.shiver <- '/Users/or105/git/shiver'
 	prog.trimmomatic <- '/Users/or105/sandbox/Trimmomatic-0.39/trimmomatic-0.39.jar'
 	prog.iva <- 'iva'
+	prog.docker.iva <- 'sangerpathogens/iva iva'
+	prog.docker.trimmomatic <- '/Trimmomatic-0.38/trimmomatic-0.38.jar'
 	smalt.k <- "15"
 	smalt.s <- "3"
 	smalt.y <- "0.7"
@@ -67,16 +69,47 @@ May2018_v210224 <- function()
 	#	make contigs with IVA
 	#
 	
+	data.dir <- "/Users/or105/Box/OR_Work/2021/2021_HCV/HCV1_210224_results/test"
+	out.dir <- "docker_iva_out"
+	cmd <- ''
+	cmd <- paste0(cmd,"docker run --rm -it -v ",data.dir,":/data sangerpathogens/iva ")
+	cmd <- paste0(cmd,"iva -f /data/reads_1.fq.gz -r /data/reads_2.fq.gz /data/",out.dir)
+	
 	i <- 1
 		 
 	cmd <- ''
 	cmd <- paste0(cmd,"CWD=$(pwd)\n")
 	cmd <- paste0(cmd,"echo $CWD\n")
-	cmd <- paste0(cmd,"DIR_FASTQ=",dir.fastq,"\n")				
 	cmd <- paste0(cmd,"SAMPLE_ID=",df$SAMPLE_ID[i],"\n")
-	cmd <- paste0(cmd,"DIR_OUT=",file.path(dir.out, '${SAMPLE_ID}'),"\n")	
+	cmd <- paste0(cmd,"DIR_INPUTS=",dir.inputs,"\n")
+	cmd <- paste0(cmd,"DIR_FASTQ=",dir.fastq,"\n")		
+	cmd <- paste0(cmd,"DIR_CONTIGS=",dir.contigs,"\n")			
+	cmd <- paste0(cmd,"DIR_CONTIGS_SAMPLE=${DIR_CONTIGS}/${SAMPLE_ID}\n")	
 	cmd <- paste0(cmd,"FASTQ_FWD=",df$fastq_fwd[i],"\n")
-	cmd <- paste0(cmd,"FASTQ_BWD=",df$fastq_bwd[i],"\n")		
+	cmd <- paste0(cmd,"FASTQ_BWD=",df$fastq_bwd[i],"\n")
+	cmd <- paste0(cmd,"mkdir -p ${DIR_CONTIGS_SAMPLE}\n")	
+	cmd <- paste0(cmd,"cp -n ",file.adapters," ${DIR_CONTIGS_SAMPLE}/adapters.fasta\n")
+	cmd <- paste0(cmd,"cp -n ",file.primers," ${DIR_CONTIGS_SAMPLE}/primers.fasta\n")	
+	cmd <- paste0(cmd,"cp -n ${DIR_FASTQ}/${FASTQ_FWD} ${DIR_CONTIGS_SAMPLE}/${FASTQ_FWD}\n")
+	cmd <- paste0(cmd,"cp -n ${DIR_FASTQ}/${FASTQ_BWD} ${DIR_CONTIGS_SAMPLE}/${FASTQ_BWD}\n")
+	tmp <- paste0("docker run --rm -it",
+			" -v ${DIR_CONTIGS_SAMPLE}:/data"," ",
+			prog.docker.iva, " ",
+			"--trimmomatic ",prog.docker.trimmomatic," ",
+			"--adapters /data/adapters.fasta ",
+			"--pcr_primers /data/primers.fasta ",
+			"--smalt_k ",smalt.k," ",
+			"--smalt_s ",smalt.s," ",
+			"--smalt_id ",smalt.y," ",
+			"-f /data/${FASTQ_FWD} ",
+			"-r /data/${FASTQ_BWD} ",
+			"/data/iva")
+	cmd <- paste0(cmd,tmp,"\n")
+	cmd <- paste0(cmd,"mv ${DIR_CONTIGS_SAMPLE}/iva/contigs.fasta ${DIR_CONTIGS}/${SAMPLE_ID}_contigs.fasta\n") 
+	cmd <- paste0(cmd,"rm -rf ${DIR_CONTIGS_SAMPLE}\n")
+	cmd <- paste0(cmd,"cd $CWD\n")
+	cat(cmd)
+	
 	tmp <- paste0(prog.iva," ",
 		"--trimmomatic ",prog.trimmomatic," ",
 		"--adapters ",file.adapters," ",
